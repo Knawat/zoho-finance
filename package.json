@@ -18,7 +18,7 @@
     "xml",
     "scrapper"
   ],
-  "author": "Knawat LLC",
+  "author": "Nirali Bhanderi <nirali.bhanderi@tatvasoft.com> (https://flaviocopes.com)",
   "license": "MIT",
   "devDependencies": {
     "@babel/cli": "^7.6.0",
