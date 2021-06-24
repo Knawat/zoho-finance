@@ -82,6 +82,10 @@ export class PurchaseOrders {
     vendor_id: string,
     status: string
     ): Promise<{ message: string }>;
+  delete(
+    orderId: string,
+    vendor_id: string
+    ): Promise<{ message: string }>;
   createReceive(
     orderId: string,
     fulfillment_center_id: string,
