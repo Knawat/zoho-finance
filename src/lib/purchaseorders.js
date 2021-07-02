@@ -240,25 +240,6 @@ class PurchaseOrders extends Request {
   }
 
   /**
-   * Delete order
-   *
-   * @param {String} orderId
-   * @param {String} vendor_id
-   * @returns {Orders}
-   */
-  delete(orderId, vendor_id) {
-    const request = {
-      path: `${this.poRequestPath}/${orderId}`,
-      method: 'DELETE',
-    };
-    return this.validateOrder(orderId, vendor_id)
-      .then(() => this.request(request))
-      .catch(err =>
-        this.errorFactory(err)
-      );
-  }
-
-  /**
    * Create purchase order receive to mark order as received
    *
    * @param {String} orderId
