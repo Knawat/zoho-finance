@@ -1,5 +1,6 @@
 export * from './zoho-address.type';
 export * from './zoho-bill.type';
+export * from './zoho-contact.type';
 export * from './zoho-purchase-order.type';
 export * from './zoho-purchase-order-comment.type';
 export * from './zoho-item.type';
