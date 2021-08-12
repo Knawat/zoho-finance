@@ -29,23 +29,11 @@ class PurchaseOrders extends Request {
    * @memberof PurchaseOrders
    */
   getPurchaseOrders(params = {}) {
-    this.validateParams(params);
     const request = {
       path: this.poRequestPath,
       params
     };
-    return this.request(request)
-      .then(order =>
-        this.transformResult(order.purchaseorders).then(
-          (orders) => {
-            orders.has_more_page =
-            order.page_context && order.page_context.has_more_page
-              ? order.page_context.has_more_page
-              : false;
-            return orders;
-          }
-        )
-      );
+    return this.request(request);
   }
 
   /**
@@ -56,7 +44,6 @@ class PurchaseOrders extends Request {
    * @returns {Order}
    */
   getPurchaseOrderById(orderId, params = {}){
-    this.validateParams(params);
     const { vendor_id, fulfillment_center_id } = params;
     const request = {
       path: `${this.poRequestPath}/${orderId}`,
@@ -93,7 +80,6 @@ class PurchaseOrders extends Request {
           return order;
         }
       )
-      .then(order => this.transformResult(order.purchaseorder))
       .catch(err => this.errorFactory(err));
   }
 
@@ -104,8 +90,7 @@ class PurchaseOrders extends Request {
    * @param {String} vendor_id
    * @returns {Order}
    */
-  getComments(orderId, params = {}) {
-    this.validateParams(params);
+  getComments(orderId) {
     const request = { path:  `${this.poRequestPath}/${orderId}/comments` };
     return this.request(request).catch(err => this.errorFactory(err));
   }
@@ -128,7 +113,6 @@ class PurchaseOrders extends Request {
       }),
     };
     return this.request(request)
-      .then(res => this.transformResult(res.purchaseorder))
       .catch(err =>
         this.errorFactory(err)
       );
@@ -141,17 +125,14 @@ class PurchaseOrders extends Request {
    * @param {PurchaseOrderItem[]} line_items
    * @returns {Order}
    */
-  updatePurchaseOrder(orderId, body) {
-    const { line_items } = body;
+  updatePurchaseOrder(orderId, vendor_id, body) {
     const request = {
       path: `${this.poRequestPath}/${orderId}`,
       method: 'PUT',
-      body: this.transformRequest({
-        line_items,
-      }),
+      body: this.transformRequest(body),
     };
-    return this.request(request)
-      .then(res => this.transformResult(res.purchaseorder))
+    return this.validateOrder(orderId, vendor_id)
+      .then(() => this.request(request))
       .catch(err =>
         this.errorFactory(err)
       );
@@ -178,7 +159,6 @@ class PurchaseOrders extends Request {
     };
     return this.validateOrder(orderId, vendor_id)
       .then(() => this.request(request))
-      .then(res => ({ comment: this.transformComment(res.comment) }))
       .catch(err =>
         this.errorFactory(err)
       );
@@ -214,7 +194,6 @@ class PurchaseOrders extends Request {
     };
     return this.validateOrder(orderId, vendor_id)
       .then(() => this.request(request))
-      .then(order => this.transformResult(order.purchaseorder))
       .catch(err =>
         this.errorFactory(err)
       );
@@ -278,121 +257,6 @@ class PurchaseOrders extends Request {
   }
 
   /**
-   * Transform the result entities
-   *
-   * @param {Context} ctx
-   * @param {Array} entities
-   */
-  transformResult(entities) {
-    if (Array.isArray(entities)) {
-      return Promise.all(
-        entities.map(async item => this.transformEntity(item))
-      ).then(orders => ({ orders }));
-    }
-    return this.transformEntity(entities).then((order) => ({
-      order,
-    }));
-  }
-
-  /**
-   * Transform a result entity
-   *
-   * @param {Object} entity
-   */
-  transformEntity(zohoPurchaseOrder) {
-    if (!zohoPurchaseOrder) return Promise.resolve({});
-    const purchaseOrder = {
-      purchaseorderId: zohoPurchaseOrder.purchaseorder_id,
-      purchaseorderNumber: zohoPurchaseOrder.purchaseorder_number,
-      date: zohoPurchaseOrder.date,
-      expectedDeliveryDate: zohoPurchaseOrder.expected_delivery_date,
-      referenceNumber: zohoPurchaseOrder.reference_number,
-      orderStatus: zohoPurchaseOrder.order_status,
-      receivedStatus: zohoPurchaseOrder.received_status,
-      receiveStatus: 
-      zohoPurchaseOrder.cf_receive_status ||
-      this.getCustomField(
-        zohoPurchaseOrder.custom_field_hash,
-        'Receive Status'
-      ),
-      billedStatus: zohoPurchaseOrder.billed_status,
-      currencyCode: zohoPurchaseOrder.currency_code,
-      currencySymbol: zohoPurchaseOrder.currency_symbol,
-      exchangeRate: zohoPurchaseOrder.exchange_rate,
-      deliveryDate: zohoPurchaseOrder.delivery_date,
-      isDropShipment: zohoPurchaseOrder.is_drop_shipment,
-      isInclusiveTax: zohoPurchaseOrder.is_inclusive_tax,
-      salesorderId: zohoPurchaseOrder.salesorder_id,
-      items:
-        zohoPurchaseOrder.line_items &&
-        zohoPurchaseOrder.line_items.map(item => this.transformItem(item)),
-      adjustment: zohoPurchaseOrder.adjustment,
-      adjustmentDescription: zohoPurchaseOrder.adjustment_description,
-      subTotal: zohoPurchaseOrder.sub_total,
-      discountTotal: zohoPurchaseOrder.discount_amount,
-      subTotalInclusiveOfTax: zohoPurchaseOrder.sub_total_inclusive_of_tax,
-      taxTotal: zohoPurchaseOrder.tax_total,
-      total: zohoPurchaseOrder.total,
-      taxes:
-        zohoPurchaseOrder.taxes &&
-        zohoPurchaseOrder.taxes.map(tax => this.transformTax(tax)),
-      notes: zohoPurchaseOrder.notes,
-      terms: zohoPurchaseOrder.terms,
-      shipVia: zohoPurchaseOrder.ship_via,
-      attention: zohoPurchaseOrder.attention,
-      deliveryOrgAddressId: zohoPurchaseOrder.delivery_org_address_id,
-      deliveryCustomerId: zohoPurchaseOrder.delivery_customer_id,
-      deliveryCustomerName: zohoPurchaseOrder.delivery_customer_name,
-      shipping:
-        zohoPurchaseOrder.delivery_address &&
-        this.transformAddress(
-          zohoPurchaseOrder.delivery_address,
-          zohoPurchaseOrder.attention
-        ),
-      createdTime: zohoPurchaseOrder.created_time,
-      lastModifiedTime: zohoPurchaseOrder.last_modified_time,
-      purchasereceives:
-        zohoPurchaseOrder.purchasereceives &&
-        zohoPurchaseOrder.purchasereceives.map(purchasereceive =>
-          this.transformPurchaseReceive(purchasereceive)
-        ),
-      salesorders: [],
-      bills:
-        zohoPurchaseOrder.bills &&
-        zohoPurchaseOrder.bills.map(bill => this.transformBill(bill)),
-      shipmentTrackingNumber:
-        zohoPurchaseOrder.cf_shipment_tracking_number ||
-        this.getCustomField(
-          zohoPurchaseOrder.custom_field_hash,
-          'Shipment Tracking Number'
-        ),
-      fulfillmentCenterId:
-        zohoPurchaseOrder.cf_fulfillment_center_id ||
-        this.getCustomField(
-          zohoPurchaseOrder.custom_field_hash,
-          'Fulfillment Center Id'
-        ),
-      po_status: zohoPurchaseOrder.status,
-    };
-    // Any status before sent should be reserved
-    if (
-      ['draft', 'to approve', 'approved'].indexOf(purchaseOrder.po_status) !==
-      -1
-    ) {
-      purchaseOrder.po_status = 'reserved';
-    }
-
-    if (zohoPurchaseOrder.comments) {
-      purchaseOrder.comments =
-        zohoPurchaseOrder.comments &&
-        zohoPurchaseOrder.comments.map(comment =>
-          this.transformComment(comment)
-        );
-    }
-    return Promise.resolve(purchaseOrder);
-  }
-
-  /**
    * Get custom field value by key
    *
    * @param {(GenericObject | undefined)} customFields
@@ -408,156 +272,6 @@ class PurchaseOrders extends Request {
   }
 
   /**
-   * Transform line items from zoho
-   *
-   * @private
-   * @static
-   * @param {ZohoItem} lineItems
-   */
-  transformItem(lineItem) {
-    const orderItem = {
-      description: lineItem.description,
-      discount: lineItem.discount,
-      discountAmount: lineItem.discount_amount,
-      lineItemId: lineItem.line_item_id,
-      id: lineItem.item_id,
-      name: lineItem.name,
-      quantity: lineItem.quantity,
-      quantityCancelled: lineItem.quantity_cancelled,
-      quantityReceived: lineItem.quantity_received,
-      rate: lineItem.rate,
-      sku: lineItem.sku,
-      total: lineItem.item_total,
-      accountId: lineItem.account_id,
-      taxId: lineItem.tax_id,
-      taxName: lineItem.tax_name,
-      taxType: lineItem.tax_type,
-      taxPercentage: lineItem.tax_percentage,
-    };
-    return orderItem;
-  }
-
-  /**
-   * Transform comment from zoho
-   *
-   * @private
-   * @static
-   * @param {ZohoPurchaseOrderComment} comment
-   */
-  transformComment(comment) {
-    const orderComment = {
-      commentId: comment.comment_id,
-      commentType: comment.comment_type,
-      date: comment.date,
-      dateDescription: comment.date_description,
-      time: comment.time,
-      operationType: comment.operation_type,
-      transactionType: comment.transaction_type,
-      description: comment.description,
-    };
-    return orderComment;
-  }
-
-  /**
-   * Transform tax from zoho
-   *
-   * @private
-   * @static
-   * @param {ZohoTax} tax
-   */
-  transformTax(tax) {
-    const orderTax = {
-      id: tax.tax_id,
-      name: tax.tax_name,
-      amount: tax.tax_amount,
-      percentage: tax.tax_percentage,
-      type: tax.tax_type,
-      isEditable: tax.is_editable,
-    };
-    return orderTax;
-  }
-
-  /**
-   * Transform address from zoho
-   *
-   * @private
-   * @static
-   * @param {ZohoAddress} address
-   * @param {string} attention
-   */
-  transformAddress(address, attention = '') {
-    const orderAddress = {
-      address_1: address.address,
-      address_2: address.street2,
-      city: address.city,
-      country: countryCode(address.country),
-      email: address.email,
-      first_name: attention
-        ? attention.split(' ').slice(0, -1).join(' ')
-        : '',
-      last_name: attention ? attention.split(' ').slice(-1).join(' ') : '',
-      phone: address.phone,
-      postcode: address.zip,
-      state: address.state,
-    };
-    return orderAddress;
-  }
-
-  /**
-   * Transform purchase receive from zoho
-   *
-   * @private
-   * @static
-   * @param {ZohoPurchaseReceive} purchasereceive
-   */
-  transformPurchaseReceive(purchasereceive) {
-    const orderPurchaseReceive = {
-      receiveId: purchasereceive.receive_id,
-      receiveNumber: purchasereceive.receive_number,
-      date: purchasereceive.date,
-      notes: purchasereceive.notes,
-      bills:
-        purchasereceive.bills &&
-        purchasereceive.bills.map(bill => this.transformBill(bill)),
-    };
-    return orderPurchaseReceive;
-  }
-
-  /**
-   * Transform bill from zoho
-   *
-   * @private
-   * @static
-   * @param {ZohoBill} bill
-   */
-  transformBill(bill) {
-    const orderBill = {
-      billId: bill.bill_id,
-      billNumber: bill.bill_number,
-      status: bill.status,
-      date: bill.date,
-      dueDate: bill.due_date,
-      total: bill.total,
-      balance: bill.balance,
-    };
-    return orderBill;
-  }
-
-  /**
-   * Check if vendor_id or fulfillment_center_id exists
-   */
-  validateParams(params) {
-    const { vendor_id, fulfillment_center_id } = params;
-    if (
-      !vendor_id &&
-      !fulfillment_center_id
-    ) {
-      throw new Error('Vendor or Fulfillment center Id is required!');
-    }
-  }
-  
-
-  /**
    * Transform PO body to zoho form
    *
    * @private
@@ -566,8 +280,8 @@ class PurchaseOrders extends Request {
    */
   transformRequest(body) {
     const orderBody = {
-      vendor_id: body.vendor_id,
-      custom_fields: [],
+      ...body,
+      custom_fields: body.custom_fields || [],
     };
     if(body.fulfillment_center_id){
       orderBody.custom_fields.push({

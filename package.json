@@ -25,7 +25,6 @@
     "@babel/core": "^7.6.0",
     "@babel/plugin-proposal-class-properties": "^7.5.5",
     "@babel/preset-env": "^7.6.0",
-    "@knawat/types": "^1.1.10",
     "babel-eslint": "^10.0.3",
     "browser-sync": "^2.26.3",
     "eslint": "^5.15.3",
